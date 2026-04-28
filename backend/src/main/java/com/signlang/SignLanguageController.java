@@ -23,11 +23,17 @@ public class SignLanguageController {
     ));
 
     @PostConstruct
-    public void init() throws IOException {
-        System.out.println("Loading landmarks data...");
-        ClassPathResource resource = new ClassPathResource("static_data/landmarks.json");
-        landmarksData = mapper.readTree(resource.getInputStream());
-        System.out.println("Landmarks data loaded.");
+    public void init() {
+        new Thread(() -> {
+            try {
+                System.out.println("Loading landmarks data in background...");
+                ClassPathResource resource = new ClassPathResource("static_data/landmarks.json");
+                landmarksData = mapper.readTree(resource.getInputStream());
+                System.out.println("Landmarks data loaded successfully.");
+            } catch (IOException e) {
+                System.err.println("Error loading landmarks data: " + e.getMessage());
+            }
+        }).start();
     }
 
     @PostMapping("/transform")
@@ -43,6 +49,9 @@ public class SignLanguageController {
 
     @GetMapping("/landmarks/{lang}/{word}")
     public JsonNode getLandmarks(@PathVariable String lang, @PathVariable String word) {
+        if (landmarksData == null) {
+            return mapper.createObjectNode().put("status", "loading");
+        }
         JsonNode langData = landmarksData.get(lang.toUpperCase());
         if (langData != null) {
             JsonNode wordData = langData.get(word.toLowerCase());
