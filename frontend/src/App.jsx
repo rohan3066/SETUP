@@ -3,7 +3,7 @@ import { Mic, Play, Settings, Video, Info, Activity, Volume2, Search } from 'luc
 import AvatarCanvas from './components/AvatarCanvas';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080/api/sign";
+const API_BASE = import.meta.env.VITE_API_BASE || "https://setup-8phr.onrender.com/api/sign";
 
 function App() {
   const [inputText, setInputText] = useState("");
@@ -24,10 +24,10 @@ function App() {
 
   const playSequence = async () => {
     if (!inputText || isPlaying) return;
-    
+
     setIsPlaying(true);
     setStatus("Analyzing...");
-    
+
     try {
       // 1. Transform sentence to words
       const transformRes = await fetch(`${API_BASE}/transform`, {
@@ -36,19 +36,23 @@ function App() {
         body: JSON.stringify({ sentence: inputText })
       });
       const words = await transformRes.json();
-      
+
       const sequenceToPlay = [];
       for (const word of words) {
         try {
           const landmarkRes = await fetch(`${API_BASE}/landmarks/${lang}/${word}`);
           if (!landmarkRes.ok) continue;
-          
+
           const text = await landmarkRes.text();
-          if (!text) continue;
-          
-          const frames = JSON.parse(text);
-          if (frames && frames.length > 0) {
-            sequenceToPlay.push({ word, frames });
+          const data = JSON.parse(text);
+          if (data.status === "loading") {
+            setStatus("Server still loading data...");
+            setIsPlaying(false);
+            return;
+          }
+
+          if (Array.isArray(data) && data.length > 0) {
+            sequenceToPlay.push({ word, frames: data });
           } else {
             console.warn(`Word not found in ${lang} DB: ${word}`);
           }
@@ -64,30 +68,36 @@ function App() {
       }
 
       setStatus(`Playing: ${sequenceToPlay.map(s => s.word).join(" ")}`);
-      
+
       let lastFrame = null;
       for (const item of sequenceToPlay) {
         const { word, frames } = item;
         speak(word); // Vocalize word as it starts
-        
+
         // Transition from last word if exists
         if (lastFrame) {
           await interpolateFrames(lastFrame, frames[0], word, 20);
         }
 
         for (let i = 0; i < frames.length - 1; i++) {
-          await interpolateFrames(frames[i], frames[i+1], word, 4);
+          await interpolateFrames(frames[i], frames[i + 1], word, 4);
         }
         lastFrame = frames[frames.length - 1];
       }
     } catch (error) {
       console.error("Playback error:", error);
-      setStatus("Error fetching data");
+      if (error.message.includes("Failed to fetch")) {
+        setStatus("Network Error: Cannot reach server");
+      } else {
+        setStatus("Error: " + error.message);
+      }
     } finally {
       setIsPlaying(false);
       setCurrentPoints(null);
       setCurrentCaption("");
-      setStatus("Ready");
+      // Keep the error message visible for 5 seconds
+      setTimeout(() => setStatus(prev => (prev.includes("Error") || prev.includes("...") ? prev : "Ready")), 5000);
+      setTimeout(() => setStatus("Ready"), 8000);
     }
   };
 
@@ -95,32 +105,32 @@ function App() {
     return new Promise((resolve) => {
       let currentStep = 0;
       const easeInOut = (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-      
+
       const step = () => {
         const t = easeInOut(currentStep / steps);
         const interpolated = frameA.map((pt, i) => {
           // Indices for hands are 33-74
           const isHand = i >= 33 && i <= 74;
-          
+
           if (frameB[i][0] === 0 && frameB[i][1] === 0) {
             // If the target is missing hand data, but we have data in frameA, keep it.
             if (isHand && pt[0] !== 0) return [pt[0], pt[1]];
             return [pt[0], pt[1]];
           }
-          
+
           if (pt[0] === 0 && pt[1] === 0) {
             return [frameB[i][0], frameB[i][1]];
           }
-          
+
           return [
             pt[0] + (frameB[i][0] - pt[0]) * t,
             pt[1] + (frameB[i][1] - pt[1]) * t
           ];
         });
-        
+
         setCurrentPoints(interpolated);
         setCurrentCaption(word);
-        
+
         currentStep++;
         if (currentStep <= steps) {
           requestAnimationFrame(step);
@@ -128,7 +138,7 @@ function App() {
           resolve();
         }
       };
-      
+
       requestAnimationFrame(step);
     });
   };
@@ -139,7 +149,7 @@ function App() {
       alert("Speech recognition not supported in this browser.");
       return;
     }
-    
+
     const recognition = new SpeechRecognition();
     recognition.lang = 'en-IN';
     recognition.onstart = () => setStatus("Listening...");
@@ -150,7 +160,7 @@ function App() {
     };
     recognition.onerror = () => setStatus("Speech error");
     recognition.onend = () => setStatus("Ready");
-    
+
     recognition.start();
   };
 
@@ -162,7 +172,7 @@ function App() {
           <Activity className="accent-text" size={28} />
           <h2 style={{ fontSize: '1.5rem', fontWeight: '800' }}>Sign<span className="accent-text">System</span></h2>
         </div>
-        
+
         <div className="status-badge">
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: status === 'Ready' ? '#44d07d' : '#ffb300' }} />
           <span style={{ color: 'var(--text-muted)' }}>{status}</span>
@@ -177,14 +187,14 @@ function App() {
 
         <div style={{ flex: 1, marginTop: '20px' }}>
           <label style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '8px', fontSize: '0.9rem' }}>Input Sentence</label>
-          <textarea 
-            className="input-area" 
-            placeholder="Type here or use voice..." 
+          <textarea
+            className="input-area"
+            placeholder="Type here or use voice..."
             rows={5}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
           />
-          
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '15px' }}>
             <button className="neon-btn secondary" onClick={startListening} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
               <Mic size={18} /> SPEECH
@@ -206,7 +216,7 @@ function App() {
       {/* Main Avatar View */}
       <div className="main-view glass-panel">
         <AvatarCanvas points={currentPoints} caption={currentCaption} />
-        
+
         {/* Overlays */}
         <div style={{ position: 'absolute', top: 20, right: 20, display: 'flex', gap: '10px' }}>
           <button className="glass-panel" style={{ padding: '10px', borderRadius: '12px' }}><Video size={20} /></button>
@@ -224,21 +234,21 @@ function App() {
           </div>
         </div>
         <div style={{ flex: 1, height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
-          <motion.div 
+          <motion.div
             initial={{ width: 0 }}
             animate={{ width: isPlaying ? '100%' : 0 }}
             transition={{ duration: 2 }}
-            style={{ height: '100%', background: 'var(--accent-color)' }} 
+            style={{ height: '100%', background: 'var(--accent-color)' }}
           />
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
-           <button 
-            onClick={() => setIsMuted(!isMuted)} 
-            className="glass-panel" 
+          <button
+            onClick={() => setIsMuted(!isMuted)}
+            className="glass-panel"
             style={{ padding: '8px', borderRadius: '10px', color: isMuted ? '#ff5252' : 'var(--accent-color)' }}
-           >
-             {isMuted ? <Volume2 size={20} style={{ opacity: 0.5 }} /> : <Volume2 size={20} />}
-           </button>
+          >
+            {isMuted ? <Volume2 size={20} style={{ opacity: 0.5 }} /> : <Volume2 size={20} />}
+          </button>
         </div>
       </div>
     </div>

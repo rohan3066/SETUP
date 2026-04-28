@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 @CrossOrigin(origins = "*")
 public class SignLanguageController {
 
-    private JsonNode landmarksData;
+    private volatile JsonNode landmarksData;
     private final ObjectMapper mapper = new ObjectMapper();
     
     private static final Set<String> FILLER_WORDS = new HashSet<>(Arrays.asList(
@@ -26,12 +26,16 @@ public class SignLanguageController {
     public void init() {
         new Thread(() -> {
             try {
-                System.out.println("Loading landmarks data in background...");
+                System.out.println("DEBUG: Starting landmarks data load. Current memory: " + (Runtime.getRuntime().totalMemory() / 1024 / 1024) + "MB");
                 ClassPathResource resource = new ClassPathResource("static_data/landmarks.json");
-                landmarksData = mapper.readTree(resource.getInputStream());
-                System.out.println("Landmarks data loaded successfully.");
-            } catch (IOException e) {
-                System.err.println("Error loading landmarks data: " + e.getMessage());
+                try (var is = resource.getInputStream()) {
+                    landmarksData = mapper.readTree(is);
+                }
+                System.out.println("DEBUG: Landmarks data loaded successfully. Memory after load: " + (Runtime.getRuntime().totalMemory() / 1024 / 1024) + "MB");
+                System.gc(); // Suggest GC to clean up temporary parsing objects
+            } catch (Exception e) {
+                System.err.println("CRITICAL ERROR loading landmarks data: " + e.getMessage());
+                e.printStackTrace();
             }
         }).start();
     }
@@ -48,18 +52,29 @@ public class SignLanguageController {
     }
 
     @GetMapping("/landmarks/{lang}/{word}")
-    public JsonNode getLandmarks(@PathVariable String lang, @PathVariable String word) {
+    public Object getLandmarks(@PathVariable String lang, @PathVariable String word) {
         if (landmarksData == null) {
-            return mapper.createObjectNode().put("status", "loading");
+            Map<String, String> error = new HashMap<>();
+            error.put("status", "loading");
+            error.put("message", "System is still initializing data. Please try again in a few seconds.");
+            return org.springframework.http.ResponseEntity.status(503).body(error);
         }
+        
         JsonNode langData = landmarksData.get(lang.toUpperCase());
-        if (langData != null) {
-            JsonNode wordData = langData.get(word.toLowerCase());
-            if (wordData != null) {
-                return wordData;
-            }
+        if (langData == null) {
+            Map<String, String> error = new HashMap<>();
+            error.put("message", "Language not supported: " + lang);
+            return org.springframework.http.ResponseEntity.status(404).body(error);
         }
-        return mapper.createArrayNode();
+
+        JsonNode wordData = langData.get(word.toLowerCase());
+        if (wordData == null) {
+            Map<String, String> error = new HashMap<>();
+            error.put("message", "Sign not found for word: " + word);
+            return org.springframework.http.ResponseEntity.status(404).body(error);
+        }
+
+        return wordData;
     }
 
     private String normalizeWord(String word) {
