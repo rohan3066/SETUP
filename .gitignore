@@ -35,7 +35,8 @@ coverage.xml
 *.pkl
 *.h5
 *.model
-**/src/main/resources/static_data/
+**/src/main/resources/static_data/*
+!**/src/main/resources/static_data/landmarks.json
 
 # Logs
 logs
