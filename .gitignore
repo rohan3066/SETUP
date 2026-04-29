@@ -32,7 +32,6 @@ coverage.xml
 .pytest_cache/
 
 # Data files (Large binary files)
-*.pkl
 *.h5
 *.model
 **/src/main/resources/static_data/*
