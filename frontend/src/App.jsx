@@ -35,7 +35,15 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sentence: inputText })
       });
+      
+      if (!transformRes.ok) {
+        throw new Error(`Server returned ${transformRes.status}: ${transformRes.statusText}`);
+      }
+
       const words = await transformRes.json();
+      if (!Array.isArray(words)) {
+        throw new Error("Invalid response format from server");
+      }
 
       const sequenceToPlay = [];
       for (const word of words) {
