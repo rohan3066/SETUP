@@ -14,6 +14,7 @@ function App() {
   const [currentCaption, setCurrentCaption] = useState("");
   const [status, setStatus] = useState("Ready");
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [lang, setLang] = useState("ISL");
   const [isMuted, setIsMuted] = useState(false);
 
@@ -29,6 +30,7 @@ function App() {
     if (!inputText || isPlaying) return;
 
     setIsPlaying(true);
+    setIsLoading(true);
     setStatus("Analyzing...");
 
     try {
@@ -44,6 +46,8 @@ function App() {
       }
 
       const words = await transformRes.json();
+      setIsLoading(false);
+      
       if (!Array.isArray(words)) {
         throw new Error("Invalid response format from server");
       }
@@ -104,6 +108,7 @@ function App() {
       }
     } finally {
       setIsPlaying(false);
+      setIsLoading(false);
       setCurrentPoints(null);
       setCurrentCaption("");
       // Keep the error message visible for 5 seconds
@@ -246,6 +251,12 @@ function App() {
 
       {/* Main Avatar View */}
       <div className="main-view glass-panel">
+        {isLoading && (
+          <div className="loader-overlay">
+            <div className="spinner"></div>
+            <div className="loading-text">Analyzing Signs...</div>
+          </div>
+        )}
         <AvatarCanvas points={currentPoints} caption={currentCaption} />
         
         <div className="language-badge">
