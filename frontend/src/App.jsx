@@ -53,10 +53,15 @@ function App() {
       }
 
       const sequenceToPlay = [];
+      const missingWords = [];
+
       for (const word of words) {
         try {
           const landmarkRes = await fetch(`${API_BASE}/landmarks/${lang}/${word}`);
-          if (!landmarkRes.ok) continue;
+          if (!landmarkRes.ok) {
+            missingWords.push(word);
+            continue;
+          }
 
           const text = await landmarkRes.text();
           const data = JSON.parse(text);
@@ -69,17 +74,24 @@ function App() {
           if (Array.isArray(data) && data.length > 0) {
             sequenceToPlay.push({ word, frames: data });
           } else {
+            missingWords.push(word);
             console.warn(`Word not found in ${lang} DB: ${word}`);
           }
         } catch (e) {
           console.error(`Error fetching word ${word}:`, e);
+          missingWords.push(word);
         }
       }
 
       if (sequenceToPlay.length === 0) {
-        setStatus("No matching signs found");
+        setStatus(`Signs not found: ${missingWords.join(", ")}`);
         setIsPlaying(false);
         return;
+      }
+
+      if (missingWords.length > 0) {
+        setStatus(`Missing: ${missingWords.join(", ")}. Playing others...`);
+        await new Promise(r => setTimeout(r, 2000)); // Show missing info for 2s
       }
 
       setStatus(`Playing: ${sequenceToPlay.map(s => s.word).join(" ")}`);

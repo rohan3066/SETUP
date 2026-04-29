@@ -19,7 +19,8 @@ public class SignLanguageController {
     private final ObjectMapper mapper = new ObjectMapper();
     
     private static final Set<String> FILLER_WORDS = new HashSet<>(Arrays.asList(
-        "is", "am", "are", "the", "a", "an", "was", "were", "to", "of", "will", "has", "have", "been", "can", "could", "should", "would", "with", "at", "in", "on", "from", "for"
+        "is", "am", "are", "the", "a", "an", "was", "were", "to", "of", "will", "has", "have", "been", "can", "could", "should", "would", "with", "at", "in", "on", "from", "for",
+        "i", "me", "my", "you", "your", "he", "him", "his", "she", "her", "it", "its", "we", "us", "our", "they", "them", "their"
     ));
 
     private static final Map<String, String> IRREGULAR_VERBS = new HashMap<>() {{
@@ -115,17 +116,31 @@ public class SignLanguageController {
     private String normalizeWord(String word) {
         if (word == null || word.isEmpty()) return "";
         
+        String w = word.toLowerCase().trim();
+        
         // 1. Check irregular dictionary
-        if (IRREGULAR_VERBS.containsKey(word)) {
-            return IRREGULAR_VERBS.get(word);
+        if (IRREGULAR_VERBS.containsKey(w)) {
+            return IRREGULAR_VERBS.get(w);
         }
         
         // 2. Simple lemmatization
-        if (word.endsWith("ing") && word.length() > 5) return word.substring(0, word.length() - 3);
-        if (word.endsWith("ed") && word.length() > 4) return word.substring(0, word.length() - 2);
-        if (word.endsWith("ies")) return word.substring(0, word.length() - 3) + "y";
-        if (word.endsWith("s") && !word.endsWith("ss") && word.length() > 3) return word.substring(0, word.length() - 1);
+        if (w.endsWith("ing")) {
+            if (w.length() > 5) return w.substring(0, w.length() - 3);
+            return w;
+        }
+        if (w.endsWith("ed")) {
+            if (w.length() > 4) return w.substring(0, w.length() - 2);
+            return w;
+        }
+        if (w.endsWith("ies")) {
+            if (w.length() > 3) return w.substring(0, w.length() - 3) + "y";
+            return w;
+        }
+        if (w.endsWith("s") && !w.endsWith("ss")) {
+            if (w.length() > 3) return w.substring(0, w.length() - 1);
+            return w;
+        }
         
-        return word;
+        return w;
     }
 }

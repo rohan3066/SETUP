@@ -36,6 +36,7 @@ coverage.xml
 *.model
 **/src/main/resources/static_data/*
 !**/src/main/resources/static_data/*.json
+data_json/
 
 # Logs
 logs
