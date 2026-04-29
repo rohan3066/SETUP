@@ -17,6 +17,12 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [lang, setLang] = useState("ISL");
   const [isMuted, setIsMuted] = useState(false);
+  const [theme, setTheme] = useState(localStorage.getItem('app-theme') || 'default');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('app-theme', theme);
+  }, [theme]);
 
   const speak = (text) => {
     if (isMuted) return;
@@ -230,6 +236,34 @@ function App() {
               <Languages size={14} style={{ marginRight: '6px' }} />
               ASL
             </button>
+          </div>
+        </div>
+
+        <div style={{ marginTop: '20px' }}>
+          <label style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '8px', fontSize: '0.9rem' }}>Appearance</label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+            {['default', 'midnight', 'light', 'cyber'].map((t) => (
+              <button
+                key={t}
+                onClick={() => setTheme(t)}
+                className="theme-btn"
+                style={{
+                  padding: '10px 5px',
+                  borderRadius: '12px',
+                  border: theme === t ? '2px solid var(--accent-color)' : '1px solid var(--panel-border)',
+                  background: theme === t ? 'rgba(255,255,255,0.05)' : 'transparent',
+                  color: theme === t ? 'var(--accent-color)' : 'var(--text-muted)',
+                  fontSize: '0.65rem',
+                  textTransform: 'uppercase',
+                  fontWeight: '800',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  letterSpacing: '1px'
+                }}
+              >
+                {t}
+              </button>
+            ))}
           </div>
         </div>
 
