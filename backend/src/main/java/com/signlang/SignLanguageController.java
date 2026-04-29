@@ -11,7 +11,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/sign")
+@RequestMapping("/api/signs")
 @CrossOrigin(origins = "*")
 public class SignLanguageController {
 
@@ -22,6 +22,25 @@ public class SignLanguageController {
         "is", "am", "are", "the", "a", "an", "was", "were", "to", "of", "will", "has", "have", "been", "can", "could", "should", "would", "with", "at", "in", "on", "from", "for"
     ));
 
+    private static final Map<String, String> IRREGULAR_VERBS = new HashMap<>() {{
+        put("am", "be"); put("is", "be"); put("are", "be"); put("was", "be"); put("were", "be");
+        put("been", "be"); put("being", "be");
+        put("went", "go"); put("gone", "go"); put("going", "go");
+        put("ate", "eat"); put("eaten", "eat"); put("eating", "eat");
+        put("saw", "see"); put("seen", "see"); put("seeing", "see");
+        put("did", "do"); put("done", "do"); put("doing", "do");
+        put("came", "come"); put("coming", "come");
+        put("bought", "buy"); put("buying", "buy");
+        put("took", "take"); put("taken", "take"); put("taking", "take");
+        put("gave", "give"); put("given", "give"); put("giving", "give");
+        put("felt", "feel"); put("feeling", "feel");
+        put("knew", "know"); put("known", "know"); put("knowing", "know");
+        put("thought", "think"); put("thinking", "think");
+        put("told", "tell"); put("telling", "tell");
+        put("said", "say"); put("saying", "say");
+        put("worked", "work"); put("working", "work");
+    }};
+
     @PostConstruct
     public void init() {
         new Thread(() -> {
@@ -31,8 +50,8 @@ public class SignLanguageController {
                 try (var is = resource.getInputStream()) {
                     landmarksData = mapper.readTree(is);
                 }
-                System.out.println("DEBUG: Landmarks data loaded successfully. Memory after load: " + (Runtime.getRuntime().totalMemory() / 1024 / 1024) + "MB");
-                System.gc(); // Suggest GC to clean up temporary parsing objects
+                System.out.println("DEBUG: Landmarks data loaded successfully.");
+                System.gc(); 
             } catch (Exception e) {
                 System.err.println("CRITICAL ERROR loading landmarks data: " + e.getMessage());
                 e.printStackTrace();
@@ -43,10 +62,13 @@ public class SignLanguageController {
     @PostMapping("/transform")
     public List<String> transform(@RequestBody Map<String, String> request) {
         String sentence = request.getOrDefault("sentence", "");
-        String[] words = sentence.toLowerCase().replace("?", "").split("\\s+");
+        // Better tokenization: remove punctuation and split by whitespace
+        String[] words = sentence.toLowerCase()
+                .replaceAll("[^a-z\\s]", "")
+                .split("\\s+");
         
         return Arrays.stream(words)
-                .filter(w -> !FILLER_WORDS.contains(w))
+                .filter(w -> !w.isEmpty() && !FILLER_WORDS.contains(w))
                 .map(this::normalizeWord)
                 .collect(Collectors.toList());
     }
@@ -56,33 +78,54 @@ public class SignLanguageController {
         if (landmarksData == null) {
             Map<String, String> error = new HashMap<>();
             error.put("status", "loading");
-            error.put("message", "System is still initializing data. Please try again in a few seconds.");
+            error.put("message", "System is still initializing data.");
             return org.springframework.http.ResponseEntity.status(503).body(error);
         }
         
         JsonNode langData = landmarksData.get(lang.toUpperCase());
         if (langData == null) {
-            Map<String, String> error = new HashMap<>();
-            error.put("message", "Language not supported: " + lang);
-            return org.springframework.http.ResponseEntity.status(404).body(error);
+            return org.springframework.http.ResponseEntity.status(404).body(Collections.singletonMap("message", "Language not supported"));
         }
 
-        JsonNode wordData = langData.get(word.toLowerCase());
+        String targetWord = word.toLowerCase();
+        JsonNode wordData = langData.get(targetWord);
+        
+        // Fallback 1: Try normalized version if original word not found
         if (wordData == null) {
-            Map<String, String> error = new HashMap<>();
-            error.put("message", "Sign not found for word: " + word);
-            return org.springframework.http.ResponseEntity.status(404).body(error);
+            String normalized = normalizeWord(targetWord);
+            if (!normalized.equals(targetWord)) {
+                wordData = langData.get(normalized);
+            }
+        }
+
+        // Fallback 2: Basic suffix stripping if still not found
+        if (wordData == null) {
+            if (targetWord.endsWith("s")) wordData = langData.get(targetWord.substring(0, targetWord.length() - 1));
+            if (wordData == null && targetWord.endsWith("ing")) wordData = langData.get(targetWord.substring(0, targetWord.length() - 3));
+            if (wordData == null && targetWord.endsWith("ed")) wordData = langData.get(targetWord.substring(0, targetWord.length() - 2));
+        }
+
+        if (wordData == null) {
+            return org.springframework.http.ResponseEntity.status(404).body(Collections.singletonMap("message", "Sign not found for: " + word));
         }
 
         return wordData;
     }
 
     private String normalizeWord(String word) {
-        // Simple lemmatization placeholder
-        // In a real app, use Stanford CoreNLP or OpenNLP
-        if (word.endsWith("ing")) return word.substring(0, word.length() - 3);
-        if (word.endsWith("s") && !word.endsWith("ss")) return word.substring(0, word.length() - 1);
-        if (word.endsWith("ed")) return word.substring(0, word.length() - 2);
+        if (word == null || word.isEmpty()) return "";
+        
+        // 1. Check irregular dictionary
+        if (IRREGULAR_VERBS.containsKey(word)) {
+            return IRREGULAR_VERBS.get(word);
+        }
+        
+        // 2. Simple lemmatization
+        if (word.endsWith("ing") && word.length() > 5) return word.substring(0, word.length() - 3);
+        if (word.endsWith("ed") && word.length() > 4) return word.substring(0, word.length() - 2);
+        if (word.endsWith("ies")) return word.substring(0, word.length() - 3) + "y";
+        if (word.endsWith("s") && !word.endsWith("ss") && word.length() > 3) return word.substring(0, word.length() - 1);
+        
         return word;
     }
 }

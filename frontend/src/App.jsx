@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Mic, Play, Settings, Video, Info, Activity, Volume2, Search } from 'lucide-react';
+import { Mic, Play, Settings, Video, Info, Activity, Volume2, Search, Languages, Globe } from 'lucide-react';
 import AvatarCanvas from './components/AvatarCanvas';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const API_BASE = import.meta.env.VITE_API_BASE || "https://setup-8phr.onrender.com/api/sign";
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080/api/signs";
 
 function App() {
   const [inputText, setInputText] = useState("");
@@ -76,11 +76,11 @@ function App() {
 
         // Transition from last word if exists
         if (lastFrame) {
-          await interpolateFrames(lastFrame, frames[0], word, 20);
+          await interpolateFrames(lastFrame, frames[0], word, 30); // Slower transition between words
         }
 
         for (let i = 0; i < frames.length - 1; i++) {
-          await interpolateFrames(frames[i], frames[i + 1], word, 4);
+          await interpolateFrames(frames[i], frames[i + 1], word, 6); // Smoother intra-word frames
         }
         lastFrame = frames[frames.length - 1];
       }
@@ -109,22 +109,29 @@ function App() {
       const step = () => {
         const t = easeInOut(currentStep / steps);
         const interpolated = frameA.map((pt, i) => {
-          // Indices for hands are 33-74
           const isHand = i >= 33 && i <= 74;
+          const target = frameB[i];
 
-          if (frameB[i][0] === 0 && frameB[i][1] === 0) {
-            // If the target is missing hand data, but we have data in frameA, keep it.
-            if (isHand && pt[0] !== 0) return [pt[0], pt[1]];
+          // If target point is missing (0,0), handle based on type
+          if (target[0] === 0 && target[1] === 0) {
+            if (isHand) {
+              // For hands, if target is missing, fade them towards the wrist or keep last position
+              // This prevents hands from disappearing instantly
+              return [pt[0], pt[1]];
+            }
             return [pt[0], pt[1]];
           }
 
+          // If starting point was missing, snap to target or interpolate from a neutral pose
           if (pt[0] === 0 && pt[1] === 0) {
-            return [frameB[i][0], frameB[i][1]];
+            return [target[0], target[1]];
           }
 
+          // Enhanced smoothing for fingers (isHand)
+          // We can use a different easing or just standard linear interpolation with higher step count
           return [
-            pt[0] + (frameB[i][0] - pt[0]) * t,
-            pt[1] + (frameB[i][1] - pt[1]) * t
+            pt[0] + (target[0] - pt[0]) * t,
+            pt[1] + (target[1] - pt[1]) * t
           ];
         });
 
@@ -180,8 +187,21 @@ function App() {
 
         <div style={{ marginTop: '20px' }}>
           <label style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '8px', fontSize: '0.9rem' }}>Sign Model</label>
-          <div className="input-area" style={{ padding: '10px', color: 'var(--accent-color)', fontWeight: 'bold' }}>
-            Indian Sign Language (ISL)
+          <div className="language-selector">
+            <button 
+              className={`lang-btn ${lang === 'ISL' ? 'active' : ''}`}
+              onClick={() => setLang('ISL')}
+            >
+              <Globe size={14} style={{ marginRight: '6px' }} />
+              ISL
+            </button>
+            <button 
+              className={`lang-btn ${lang === 'ASL' ? 'active' : ''}`}
+              onClick={() => setLang('ASL')}
+            >
+              <Languages size={14} style={{ marginRight: '6px' }} />
+              ASL
+            </button>
           </div>
         </div>
 
@@ -216,6 +236,10 @@ function App() {
       {/* Main Avatar View */}
       <div className="main-view glass-panel">
         <AvatarCanvas points={currentPoints} caption={currentCaption} />
+        
+        <div className="language-badge">
+          {lang === 'ISL' ? 'Indian Sign Language' : 'American Sign Language'}
+        </div>
 
         {/* Overlays */}
         <div style={{ position: 'absolute', top: 20, right: 20, display: 'flex', gap: '10px' }}>

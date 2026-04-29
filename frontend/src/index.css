@@ -128,3 +128,56 @@ canvas {
   max-width: 100%;
   max-height: 100%;
 }
+
+.language-selector {
+  display: flex;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 6px;
+  border-radius: 16px;
+  border: 1px solid var(--panel-border);
+}
+
+.lang-btn {
+  flex: 1;
+  padding: 10px 15px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.lang-btn.active {
+  background: var(--accent-color);
+  color: white;
+  box-shadow: 0 4px 20px rgba(255, 105, 180, 0.4);
+}
+
+.lang-btn:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+
+.language-badge {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  padding: 8px 16px;
+  border-radius: 100px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent-secondary);
+  pointer-events: none;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}

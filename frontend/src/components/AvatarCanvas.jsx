@@ -266,54 +266,88 @@ const AvatarCanvas = ({ points, caption }) => {
     // 6. Hands and Fingers
     const wristL = getPt(15), wristR = getPt(16);
     
-    // Draw Palms (Larger)
-    ctx.strokeStyle = COLORS.HAND_STROKE;
-    ctx.lineWidth = 1.5;
-    if (wristL) {
+    const drawHandStructure = (startIdx, wrist) => {
+      if (!wrist) return;
+      
+      // Draw Palm (Structured)
+      ctx.save();
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = 'rgba(0,0,0,0.4)';
       ctx.fillStyle = COLORS.HAND;
+      ctx.strokeStyle = COLORS.HAND_STROKE;
+      ctx.lineWidth = 2;
+      
       ctx.beginPath();
-      ctx.ellipse(wristL.x, wristL.y, 12, 10, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-    }
-    if (wristR) {
-      ctx.fillStyle = COLORS.HAND;
-      ctx.beginPath();
-      ctx.ellipse(wristR.x, wristR.y, 12, 10, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-    }
-
-    // Draw Detailed Fingers (Thicker)
-    const drawHand = (startIdx) => {
-      Object.values(FINGER_LANDMARKS).forEach(ids => {
-        ctx.strokeStyle = COLORS.HAND_STROKE;
-        ctx.lineWidth = 5; // Thicker fingers
-        ctx.lineCap = 'round';
+      const palmPoints = [0, 1, 5, 9, 13, 17].map(id => getPt(startIdx + id)).filter(Boolean);
+      if (palmPoints.length > 2) {
+        ctx.moveTo(palmPoints[0].x, palmPoints[0].y);
+        for(let i = 1; i < palmPoints.length; i++) ctx.lineTo(palmPoints[i].x, palmPoints[i].y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      } else {
         ctx.beginPath();
-        let first = true;
-        ids.forEach((id) => {
-          const pt = getPt(startIdx + id);
-          if (pt) {
-            if (first) {
-              ctx.moveTo(pt.x, pt.y);
-              first = false;
-            } else {
-              ctx.lineTo(pt.x, pt.y);
-            }
+        ctx.ellipse(wrist.x, wrist.y, 14, 12, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Draw Fingers (Curved & Tapered)
+      Object.values(FINGER_LANDMARKS).forEach(ids => {
+        const fingerPts = ids.map(id => getPt(startIdx + id)).filter(Boolean);
+        if (fingerPts.length < 2) return;
+
+        // Outer Glow/Stroke for depth
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        
+        // Shadow pass
+        ctx.shadowBlur = 4;
+        ctx.shadowColor = 'rgba(0,0,0,0.3)';
+        ctx.strokeStyle = COLORS.HAND_STROKE;
+        
+        // Draw Curved Path
+        ctx.beginPath();
+        ctx.moveTo(fingerPts[0].x, fingerPts[0].y);
+        for (let i = 0; i < fingerPts.length - 1; i++) {
+          const xc = (fingerPts[i].x + fingerPts[i + 1].x) / 2;
+          const yc = (fingerPts[i].y + fingerPts[i + 1].y) / 2;
+          ctx.quadraticCurveTo(fingerPts[i].x, fingerPts[i].y, xc, yc);
+        }
+        ctx.lineTo(fingerPts[fingerPts.length - 1].x, fingerPts[fingerPts.length - 1].y);
+        
+        ctx.lineWidth = 6;
+        ctx.stroke();
+        ctx.shadowBlur = 0; // Reset shadow
+
+        // Inner Fill (Tapered effect using multiple strokes)
+        ctx.strokeStyle = COLORS.HAND;
+        ctx.lineWidth = 4;
+        ctx.stroke();
+
+        // Joint Highlights
+        fingerPts.forEach((p, idx) => {
+          if (idx === 0) return; // Skip wrist-finger connection
+          ctx.fillStyle = 'rgba(255,255,255,0.2)';
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Small knuckle line
+          if (idx < fingerPts.length - 1) {
+             ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+             ctx.lineWidth = 1;
+             ctx.beginPath();
+             ctx.arc(p.x, p.y, 3, 0, Math.PI);
+             ctx.stroke();
           }
         });
-        ctx.stroke();
-
-        // Optional: Inner skin color for fingers to make them look like solid tubes
-        ctx.strokeStyle = COLORS.HAND;
-        ctx.lineWidth = 3;
-        ctx.stroke();
       });
     };
 
-    drawHand(33); // Left Hand
-    drawHand(54); // Right Hand
+    drawHandStructure(33, wristL); // Left Hand
+    drawHandStructure(54, wristR); // Right Hand
 
     // 7. Caption
     if (caption) {
