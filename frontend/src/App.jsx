@@ -3,7 +3,10 @@ import { Mic, Play, Settings, Video, Info, Activity, Volume2, Search, Languages,
 import AvatarCanvas from './components/AvatarCanvas';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080/api/signs";
+let API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080/api/signs";
+if (API_BASE.endsWith("/api/sign")) {
+  API_BASE += "s";
+}
 
 function App() {
   const [inputText, setInputText] = useState("");
